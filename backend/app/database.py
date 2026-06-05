@@ -1,5 +1,6 @@
 import os
 import json
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -10,25 +11,127 @@ TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
 DB_PATH = Path(__file__).resolve().parents[1] / "claims.db"
 
 
+# ── Turso HTTP adapter ────────────────────────────────────────────────────────
+
+class _TursoCursor:
+    """Minimal cursor-like object returned by _TursoConn.execute()."""
+
+    def __init__(self, cols: list[str], rows: list[list]):
+        self.description = [(c, None, None, None, None, None, None) for c in cols]
+        self._rows = [dict(zip(cols, row)) for row in rows]
+
+    def fetchone(self) -> dict | None:
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self) -> list[dict]:
+        return self._rows
+
+
+class _TursoConn:
+    """Thin synchronous wrapper around Turso's /v2/pipeline HTTP API."""
+
+    def __init__(self, url: str, token: str):
+        self._endpoint = url.replace("libsql://", "https://") + "/v2/pipeline"
+        self._headers  = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type":  "application/json",
+        }
+
+    def execute(self, sql: str, params: tuple = ()) -> _TursoCursor:
+        import httpx
+
+        args = []
+        for p in params:
+            if p is None:
+                args.append({"type": "null"})
+            elif isinstance(p, bool):
+                args.append({"type": "integer", "value": "1" if p else "0"})
+            elif isinstance(p, int):
+                args.append({"type": "integer", "value": str(p)})
+            elif isinstance(p, float):
+                args.append({"type": "float", "value": str(p)})
+            else:
+                args.append({"type": "text", "value": str(p)})
+
+        stmt: dict = {"sql": sql}
+        if args:
+            stmt["args"] = args
+
+        resp = httpx.post(
+            self._endpoint,
+            json={"requests": [{"type": "execute", "stmt": stmt}, {"type": "close"}]},
+            headers=self._headers,
+            timeout=15,
+        )
+        resp.raise_for_status()
+
+        result = resp.json()["results"][0]["response"]["result"]
+        cols = [c["name"] for c in result.get("cols", [])]
+        raw_rows = result.get("rows", [])
+
+        rows = []
+        for raw in raw_rows:
+            row = []
+            for cell in raw:
+                t, v = cell.get("type"), cell.get("value")
+                if t == "null" or v is None:
+                    row.append(None)
+                elif t == "integer":
+                    row.append(int(v))
+                elif t == "float":
+                    row.append(float(v))
+                else:
+                    row.append(v)
+            rows.append(row)
+
+        return _TursoCursor(cols, rows)
+
+    def commit(self):  # auto-committed via HTTP
+        pass
+
+    def close(self):
+        pass
+
+
+# ── SQLite adapter (local) ────────────────────────────────────────────────────
+
 def _row_factory(cursor, row):
     return {col[0]: val for col, val in zip(cursor.description, row)}
 
 
+class _SQLiteConn:
+    """Thin wrapper that gives sqlite3 the same interface as _TursoConn."""
+
+    def __init__(self):
+        self._conn = sqlite3.connect(str(DB_PATH))
+        self._conn.row_factory = _row_factory
+
+    def execute(self, sql: str, params: tuple = ()):
+        return self._conn.execute(sql, params)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
+# ── unified context manager ───────────────────────────────────────────────────
+
 @contextmanager
 def _conn():
     if TURSO_URL and TURSO_TOKEN:
-        import libsql_experimental as libsql
-        conn = libsql.connect(TURSO_URL, auth_token=TURSO_TOKEN)
+        conn = _TursoConn(TURSO_URL, TURSO_TOKEN)
     else:
-        import sqlite3
-        conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = _row_factory
+        conn = _SQLiteConn()
     try:
         yield conn
         conn.commit()
     finally:
         conn.close()
 
+
+# ── schema ────────────────────────────────────────────────────────────────────
 
 def init_db() -> None:
     with _conn() as conn:
@@ -103,7 +206,7 @@ def init_db() -> None:
         """)
 
 
-# ── sessions (auth tokens) ────────────────────────────────────────────────────
+# ── sessions (auth) ───────────────────────────────────────────────────────────
 
 def save_token(token: str, user: dict) -> None:
     with _conn() as conn:
@@ -117,10 +220,9 @@ def get_token(token: str) -> dict | None:
     if not token:
         return None
     with _conn() as conn:
-        row = conn.execute(
+        return conn.execute(
             "SELECT username FROM sessions WHERE token = ?", (token,)
         ).fetchone()
-    return row  # {"username": "..."} or None
 
 
 def delete_token(token: str) -> None:
@@ -161,14 +263,12 @@ def get_claims(role: str = "reviewer", member_id: str | None = None) -> list[dic
         else:
             rows = conn.execute(
                 "SELECT * FROM claims WHERE submitted_by = ? ORDER BY submitted_at DESC",
-                (member_id or "",)
+                (member_id or "",),
             ).fetchall()
-    result = []
     for r in rows:
         r["claim_json"]    = json.loads(r["claim_json"])
         r["decision_json"] = json.loads(r["decision_json"])
-        result.append(r)
-    return result
+    return rows
 
 
 def save_override(claim_id: str, reviewer: str, action: str, reason: str) -> None:
@@ -182,20 +282,20 @@ def save_override(claim_id: str, reviewer: str, action: str, reason: str) -> Non
 
 def get_stats() -> dict:
     with _conn() as conn:
-        total        = conn.execute("SELECT COUNT(*) AS cnt FROM claims").fetchone()["cnt"]
-        rows         = conn.execute("SELECT decision, COUNT(*) AS cnt FROM claims GROUP BY decision").fetchall()
-        by_decision  = {r["decision"]: r["cnt"] for r in rows}
+        total          = conn.execute("SELECT COUNT(*) AS cnt FROM claims").fetchone()["cnt"]
+        rows           = conn.execute("SELECT decision, COUNT(*) AS cnt FROM claims GROUP BY decision").fetchall()
+        by_decision    = {r["decision"]: r["cnt"] for r in rows}
         total_approved = conn.execute(
             "SELECT COALESCE(SUM(approved_amount),0) AS total FROM claims WHERE decision IN ('APPROVED','PARTIAL')"
         ).fetchone()["total"]
-        avg_claim    = conn.execute(
+        avg_claim      = conn.execute(
             "SELECT COALESCE(AVG(claim_amount),0) AS avg FROM claims"
         ).fetchone()["avg"]
-        pending      = conn.execute(
+        pending        = conn.execute(
             "SELECT COUNT(*) AS cnt FROM claims WHERE decision='MANUAL_REVIEW'"
         ).fetchone()["cnt"]
-        total_ai     = conn.execute("SELECT COUNT(*) AS cnt FROM ai_logs").fetchone()["cnt"]
-        total_tokens = conn.execute(
+        total_ai       = conn.execute("SELECT COUNT(*) AS cnt FROM ai_logs").fetchone()["cnt"]
+        total_tokens   = conn.execute(
             "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS total FROM ai_logs"
         ).fetchone()["total"]
     return {
@@ -261,14 +361,8 @@ def get_appeals(role: str = "reviewer") -> list[dict]:
 # ── AI logs ───────────────────────────────────────────────────────────────────
 
 def log_ai_call(
-    call_type: str,
-    model: str,
-    prompt_preview: str,
-    response_preview: str | None,
-    prompt_tokens: int,
-    completion_tokens: int,
-    latency_ms: int,
-    error: str | None = None,
+    call_type: str, model: str, prompt_preview: str, response_preview: str | None,
+    prompt_tokens: int, completion_tokens: int, latency_ms: int, error: str | None = None,
 ) -> None:
     with _conn() as conn:
         conn.execute("""
