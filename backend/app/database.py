@@ -5,8 +5,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-TURSO_URL   = os.getenv("TURSO_URL", "")
-TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
+TURSO_URL   = os.getenv("TURSO_URL", "").strip()
+TURSO_TOKEN = os.getenv("TURSO_TOKEN", "").strip()
 
 DB_PATH = Path(__file__).resolve().parents[1] / "claims.db"
 
@@ -31,7 +31,12 @@ class _TursoConn:
     """Thin synchronous wrapper around Turso's /v2/pipeline HTTP API."""
 
     def __init__(self, url: str, token: str):
-        self._endpoint = url.replace("libsql://", "https://") + "/v2/pipeline"
+        url = url.strip()
+        if url.startswith("libsql://"):
+            url = "https://" + url[len("libsql://"):]
+        elif not url.startswith("http"):
+            url = "https://" + url
+        self._endpoint = url.rstrip("/") + "/v2/pipeline"
         self._headers  = {
             "Authorization": f"Bearer {token}",
             "Content-Type":  "application/json",
