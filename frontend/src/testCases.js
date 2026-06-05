@@ -1,0 +1,94 @@
+export const TEST_CASES = [
+  {
+    case_id: 'TC001', case_name: 'Simple Consultation',
+    description: 'Regular consultation for fever, all docs valid', expected_decision: 'APPROVED',
+    claim: {
+      member_id: 'EMP001', member_name: 'Rajesh Kumar', treatment_date: '2024-11-01', claim_amount: 1500,
+      prescription: { doctor_name: 'Dr. Sharma', doctor_reg: 'KA/45678/2015', diagnosis: 'Viral fever', medicines_prescribed: ['Paracetamol 650mg', 'Vitamin C'] },
+      bill: { consultation_fee: 1000, diagnostic_tests: 500 },
+    },
+  },
+  {
+    case_id: 'TC002', case_name: 'Dental – Partial Approval',
+    description: 'Root canal + cosmetic whitening', expected_decision: 'PARTIAL',
+    claim: {
+      member_id: 'EMP002', member_name: 'Priya Singh', treatment_date: '2024-10-15', claim_amount: 12000,
+      prescription: { doctor_name: 'Dr. Patel', doctor_reg: 'MH/23456/2018', diagnosis: 'Tooth decay requiring root canal', procedures: ['Root canal treatment', 'Teeth whitening'] },
+      bill: { root_canal: 8000, teeth_whitening: 4000 },
+    },
+  },
+  {
+    case_id: 'TC003', case_name: 'Limit Exceeded',
+    description: 'Claim exceeds per-claim limit of ₹5,000', expected_decision: 'REJECTED',
+    claim: {
+      member_id: 'EMP003', member_name: 'Amit Verma', treatment_date: '2024-10-20', claim_amount: 7500,
+      prescription: { doctor_name: 'Dr. Gupta', doctor_reg: 'DL/34567/2016', diagnosis: 'Gastroenteritis', medicines_prescribed: ['Antibiotics', 'Probiotics'] },
+      bill: { consultation_fee: 2000, medicines: 5500 },
+    },
+  },
+  {
+    case_id: 'TC004', case_name: 'Missing Prescription',
+    description: 'Prescription missing from submission', expected_decision: 'REJECTED',
+    claim: {
+      member_id: 'EMP004', member_name: 'Sneha Reddy', treatment_date: '2024-10-25', claim_amount: 2000,
+      bill: { consultation_fee: 1500, medicines: 500 },
+    },
+  },
+  {
+    case_id: 'TC005', case_name: 'Waiting Period',
+    description: 'Diabetes treatment within 90-day waiting period', expected_decision: 'REJECTED',
+    claim: {
+      member_id: 'EMP005', member_name: 'Vikram Joshi', member_join_date: '2024-09-01',
+      treatment_date: '2024-10-15', claim_amount: 3000,
+      prescription: { doctor_name: 'Dr. Mehta', doctor_reg: 'GJ/56789/2014', diagnosis: 'Type 2 Diabetes', medicines_prescribed: ['Metformin', 'Glimepiride'] },
+      bill: { consultation_fee: 1000, medicines: 2000 },
+    },
+  },
+  {
+    case_id: 'TC006', case_name: 'Alternative Medicine',
+    description: 'Ayurvedic Panchakarma within limits', expected_decision: 'APPROVED',
+    claim: {
+      member_id: 'EMP006', member_name: 'Kavita Nair', treatment_date: '2024-10-28', claim_amount: 4000,
+      prescription: { doctor_name: 'Vaidya Krishnan', doctor_reg: 'AYUR/KL/2345/2019', diagnosis: 'Chronic joint pain', treatment: 'Panchakarma therapy' },
+      bill: { consultation_fee: 1000, therapy_charges: 3000 },
+    },
+  },
+  {
+    case_id: 'TC007', case_name: 'Pre-auth Required',
+    description: 'MRI scan without pre-authorisation', expected_decision: 'REJECTED',
+    claim: {
+      member_id: 'EMP007', member_name: 'Suresh Patil', treatment_date: '2024-11-02', claim_amount: 15000,
+      prescription: { doctor_name: 'Dr. Rao', doctor_reg: 'AP/67890/2017', diagnosis: 'Suspected lumbar disc herniation', tests_prescribed: ['MRI Lumbar Spine'] },
+      bill: { mri_scan: 15000 },
+    },
+  },
+  {
+    case_id: 'TC008', case_name: 'Fraud – Manual Review',
+    description: 'Multiple high-value claims same day', expected_decision: 'MANUAL_REVIEW',
+    claim: {
+      member_id: 'EMP008', member_name: 'Ravi Menon', treatment_date: '2024-10-30', claim_amount: 4800,
+      previous_claims_same_day: 3,
+      prescription: { doctor_name: 'Dr. Khan', doctor_reg: 'UP/45678/2016', diagnosis: 'Migraine', medicines_prescribed: ['Sumatriptan', 'Propranolol'] },
+      bill: { consultation_fee: 2000, medicines: 2800 },
+    },
+  },
+  {
+    case_id: 'TC009', case_name: 'Excluded Treatment',
+    description: 'Bariatric / weight loss not covered', expected_decision: 'REJECTED',
+    claim: {
+      member_id: 'EMP009', member_name: 'Anita Desai', treatment_date: '2024-10-18', claim_amount: 8000,
+      prescription: { doctor_name: 'Dr. Banerjee', doctor_reg: 'WB/34567/2015', diagnosis: 'Obesity - BMI 35', treatment: 'Bariatric consultation and diet plan' },
+      bill: { consultation_fee: 3000, diet_plan: 5000 },
+    },
+  },
+  {
+    case_id: 'TC010', case_name: 'Network Hospital – Cashless',
+    description: 'Apollo Hospitals cashless instant approval', expected_decision: 'APPROVED',
+    claim: {
+      member_id: 'EMP010', member_name: 'Deepak Shah', treatment_date: '2024-11-03', claim_amount: 4500,
+      hospital: 'Apollo Hospitals', cashless_request: true,
+      prescription: { doctor_name: 'Dr. Iyer', doctor_reg: 'TN/56789/2013', diagnosis: 'Acute bronchitis', medicines_prescribed: ['Antibiotics', 'Bronchodilators'] },
+      bill: { consultation_fee: 1500, medicines: 3000 },
+    },
+  },
+]

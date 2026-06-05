@@ -1,0 +1,13 @@
+# --- core ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+python-multipart>=0.0.9
+python-dotenv>=1.0
+pytest>=8.0
+
+# --- AI / LLM ---
+openai>=1.30          # OpenAI-compatible client (Groq / Together / Ollama)
+
+# --- optional: PDF text extraction (pip install pymupdf) ---
+# pymupdf>=1.24
