@@ -1,4 +1,4 @@
-const BASE = '/api'
+const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {}
