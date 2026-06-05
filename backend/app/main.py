@@ -50,6 +50,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import APIRouter
+router = APIRouter(prefix="/api")
+
 
 @app.on_event("startup")
 def startup() -> None:
@@ -84,7 +87,7 @@ class LoginRequest(BaseModel):
     password: str
 
 
-@app.post("/auth/login", tags=["auth"])
+@router.post("/auth/login", tags=["auth"])
 def login(body: LoginRequest) -> dict:
     token = auth_login(body.username, body.password)
     if not token:
@@ -93,7 +96,7 @@ def login(body: LoginRequest) -> dict:
     return {"token": token, "user": {k: v for k, v in user.items() if k != "password"}}
 
 
-@app.get("/auth/me", tags=["auth"])
+@router.get("/auth/me", tags=["auth"])
 def me(authorization: str | None = Header(default=None)) -> dict:
     user = _require_user(authorization)
     return {k: v for k, v in user.items() if k != "password"}
@@ -101,17 +104,17 @@ def me(authorization: str | None = Header(default=None)) -> dict:
 
 # ── meta ─────────────────────────────────────────────────────────────────────
 
-@app.get("/health", tags=["meta"])
+@router.get("/health", tags=["meta"])
 def health() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/policy", tags=["meta"])
+@router.get("/policy", tags=["meta"])
 def policy() -> dict:
     return get_policy()
 
 
-@app.put("/policy", tags=["meta"])
+@router.put("/policy", tags=["meta"])
 def update_policy(
     body: dict,
     authorization: str | None = Header(default=None),
@@ -125,7 +128,7 @@ def update_policy(
 
 # ── adjudication ─────────────────────────────────────────────────────────────
 
-@app.post("/adjudicate", response_model=Decision, tags=["claims"])
+@router.post("/adjudicate", response_model=Decision, tags=["claims"])
 def adjudicate_claim(
     claim: Claim,
     authorization: str | None = Header(default=None),
@@ -173,7 +176,7 @@ def adjudicate_claim(
 
 # ── document extraction (AI) ─────────────────────────────────────────────────
 
-@app.post("/extract", tags=["claims"])
+@router.post("/extract", tags=["claims"])
 async def extract_document(
     file: UploadFile = File(...),
     authorization: str | None = Header(default=None),
@@ -215,7 +218,7 @@ async def extract_document(
     return extracted
 
 
-@app.post("/claims/upload", tags=["claims"])
+@router.post("/claims/upload", tags=["claims"])
 async def upload_and_adjudicate(
     file: UploadFile = File(...),
     authorization: str | None = Header(default=None),
@@ -232,7 +235,7 @@ async def upload_and_adjudicate(
 
 # ── claims history ────────────────────────────────────────────────────────────
 
-@app.get("/claims", tags=["claims"])
+@router.get("/claims", tags=["claims"])
 def list_claims(
     authorization: str | None = Header(default=None),
 ) -> list[dict]:
@@ -256,7 +259,7 @@ class ReplyRequest(BaseModel):
     message: str
 
 
-@app.post("/claims/{claim_id}/appeal", tags=["claims"])
+@router.post("/claims/{claim_id}/appeal", tags=["claims"])
 def appeal_claim(
     claim_id: str,
     body: AppealRequest,
@@ -269,7 +272,7 @@ def appeal_claim(
     return {"status": "ok", "claim_id": claim_id}
 
 
-@app.post("/claims/{claim_id}/reply", tags=["claims"])
+@router.post("/claims/{claim_id}/reply", tags=["claims"])
 def reply_claim(
     claim_id: str,
     body: ReplyRequest,
@@ -284,7 +287,7 @@ def reply_claim(
     return {"status": "ok"}
 
 
-@app.get("/claims/{claim_id}/thread", tags=["claims"])
+@router.get("/claims/{claim_id}/thread", tags=["claims"])
 def claim_thread(
     claim_id: str,
     authorization: str | None = Header(default=None),
@@ -293,7 +296,7 @@ def claim_thread(
     return get_appeal_thread(claim_id)
 
 
-@app.get("/appeals", tags=["claims"])
+@router.get("/appeals", tags=["claims"])
 def list_appeals(authorization: str | None = Header(default=None)) -> list[dict]:
     user = _require_user(authorization)
     if user["role"] not in ("reviewer", "admin"):
@@ -301,7 +304,7 @@ def list_appeals(authorization: str | None = Header(default=None)) -> list[dict]
     return get_appeals()
 
 
-@app.post("/claims/{claim_id}/override", tags=["claims"])
+@router.post("/claims/{claim_id}/override", tags=["claims"])
 def override_claim(
     claim_id: str,
     body: OverrideRequest,
@@ -318,7 +321,7 @@ def override_claim(
 
 # ── AI logs + stats ───────────────────────────────────────────────────────────
 
-@app.get("/ai-logs", tags=["ai"])
+@router.get("/ai-logs", tags=["ai"])
 def ai_logs(
     limit: int = 100,
     authorization: str | None = Header(default=None),
@@ -329,9 +332,12 @@ def ai_logs(
     return get_ai_logs(limit=limit)
 
 
-@app.get("/stats", tags=["meta"])
+@router.get("/stats", tags=["meta"])
 def stats(authorization: str | None = Header(default=None)) -> dict:
     user = _require_user(authorization)
     if user["role"] not in ("admin", "reviewer", "ai_agent"):
         raise HTTPException(403, "Not authorised")
     return get_stats()
+
+
+app.include_router(router)
