@@ -1,29 +1,59 @@
-import sqlite3
+import os
 import json
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+TURSO_URL   = os.getenv("TURSO_URL", "")
+TURSO_TOKEN = os.getenv("TURSO_TOKEN", "")
+
 DB_PATH = Path(__file__).resolve().parents[1] / "claims.db"
+
+
+def _row_factory(cursor, row):
+    return {col[0]: val for col, val in zip(cursor.description, row)}
+
+
+@contextmanager
+def _conn():
+    if TURSO_URL and TURSO_TOKEN:
+        import libsql_experimental as libsql
+        conn = libsql.connect(TURSO_URL, auth_token=TURSO_TOKEN)
+    else:
+        import sqlite3
+        conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = _row_factory
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
     with _conn() as conn:
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token      TEXT PRIMARY KEY,
+                username   TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS claims (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                claim_id        TEXT NOT NULL,
-                member_id       TEXT NOT NULL,
-                member_name     TEXT NOT NULL,
-                treatment_date  TEXT NOT NULL,
-                claim_amount    REAL NOT NULL,
-                decision        TEXT NOT NULL,
-                approved_amount REAL NOT NULL,
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id         TEXT NOT NULL,
+                member_id        TEXT NOT NULL,
+                member_name      TEXT NOT NULL,
+                treatment_date   TEXT NOT NULL,
+                claim_amount     REAL NOT NULL,
+                decision         TEXT NOT NULL,
+                approved_amount  REAL NOT NULL,
                 confidence_score REAL NOT NULL,
-                claim_json      TEXT NOT NULL,
-                decision_json   TEXT NOT NULL,
-                submitted_by    TEXT NOT NULL DEFAULT 'employee',
-                submitted_at    TEXT NOT NULL
+                claim_json       TEXT NOT NULL,
+                decision_json    TEXT NOT NULL,
+                submitted_by     TEXT NOT NULL DEFAULT 'employee',
+                submitted_at     TEXT NOT NULL
             )
         """)
         conn.execute("""
@@ -73,18 +103,32 @@ def init_db() -> None:
         """)
 
 
-@contextmanager
-def _conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+# ── sessions (auth tokens) ────────────────────────────────────────────────────
+
+def save_token(token: str, user: dict) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO sessions (token, username) VALUES (?, ?)",
+            (token, user["username"]),
+        )
 
 
-# ── claims ───────────────────────────────────────────────────────────────────
+def get_token(token: str) -> dict | None:
+    if not token:
+        return None
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT username FROM sessions WHERE token = ?", (token,)
+        ).fetchone()
+    return row  # {"username": "..."} or None
+
+
+def delete_token(token: str) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+# ── claims ────────────────────────────────────────────────────────────────────
 
 def save_claim(claim_id: str, claim_dict: dict, decision_dict: dict, submitted_by: str = "employee") -> None:
     with _conn() as conn:
@@ -121,10 +165,9 @@ def get_claims(role: str = "reviewer", member_id: str | None = None) -> list[dic
             ).fetchall()
     result = []
     for r in rows:
-        d = dict(r)
-        d["claim_json"] = json.loads(d["claim_json"])
-        d["decision_json"] = json.loads(d["decision_json"])
-        result.append(d)
+        r["claim_json"]    = json.loads(r["claim_json"])
+        r["decision_json"] = json.loads(r["decision_json"])
+        result.append(r)
     return result
 
 
@@ -139,93 +182,83 @@ def save_override(claim_id: str, reviewer: str, action: str, reason: str) -> Non
 
 def get_stats() -> dict:
     with _conn() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0]
-        rows = conn.execute(
-            "SELECT decision, COUNT(*) as cnt FROM claims GROUP BY decision"
-        ).fetchall()
-        by_decision = {r["decision"]: r["cnt"] for r in rows}
+        total        = conn.execute("SELECT COUNT(*) AS cnt FROM claims").fetchone()["cnt"]
+        rows         = conn.execute("SELECT decision, COUNT(*) AS cnt FROM claims GROUP BY decision").fetchall()
+        by_decision  = {r["decision"]: r["cnt"] for r in rows}
         total_approved = conn.execute(
-            "SELECT COALESCE(SUM(approved_amount),0) FROM claims WHERE decision IN ('APPROVED','PARTIAL')"
-        ).fetchone()[0]
-        avg_claim = conn.execute(
-            "SELECT COALESCE(AVG(claim_amount),0) FROM claims"
-        ).fetchone()[0]
-        pending_review = conn.execute(
-            "SELECT COUNT(*) FROM claims WHERE decision='MANUAL_REVIEW'"
-        ).fetchone()[0]
-        total_ai = conn.execute("SELECT COUNT(*) FROM ai_logs").fetchone()[0]
+            "SELECT COALESCE(SUM(approved_amount),0) AS total FROM claims WHERE decision IN ('APPROVED','PARTIAL')"
+        ).fetchone()["total"]
+        avg_claim    = conn.execute(
+            "SELECT COALESCE(AVG(claim_amount),0) AS avg FROM claims"
+        ).fetchone()["avg"]
+        pending      = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM claims WHERE decision='MANUAL_REVIEW'"
+        ).fetchone()["cnt"]
+        total_ai     = conn.execute("SELECT COUNT(*) AS cnt FROM ai_logs").fetchone()["cnt"]
         total_tokens = conn.execute(
-            "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM ai_logs"
-        ).fetchone()[0]
+            "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS total FROM ai_logs"
+        ).fetchone()["total"]
     return {
-        "total_claims": total,
-        "by_decision": by_decision,
+        "total_claims":          total,
+        "by_decision":           by_decision,
         "total_approved_amount": round(total_approved, 2),
-        "avg_claim_amount": round(avg_claim, 2),
-        "pending_review": pending_review,
-        "total_ai_calls": total_ai,
-        "total_tokens_used": total_tokens,
-        "approval_rate": round(
+        "avg_claim_amount":      round(avg_claim, 2),
+        "pending_review":        pending,
+        "total_ai_calls":        total_ai,
+        "total_tokens_used":     total_tokens,
+        "approval_rate":         round(
             (by_decision.get("APPROVED", 0) + by_decision.get("PARTIAL", 0)) / total * 100, 1
         ) if total else 0,
     }
 
 
-# ── same-day count (auto-computed, never user-supplied) ──────────────────────
-
 def count_same_day_claims(member_id: str, treatment_date: str) -> int:
     with _conn() as conn:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM claims WHERE member_id = ? AND treatment_date = ?",
-            (member_id, treatment_date)
-        ).fetchone()[0]
-    return count
+        return conn.execute(
+            "SELECT COUNT(*) AS cnt FROM claims WHERE member_id = ? AND treatment_date = ?",
+            (member_id, treatment_date),
+        ).fetchone()["cnt"]
 
 
-# ── appeals ──────────────────────────────────────────────────────────────────
+# ── appeals ───────────────────────────────────────────────────────────────────
 
 def submit_appeal(claim_id: str, submitted_by: str, message: str) -> None:
     now = datetime.utcnow().isoformat()
     with _conn() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO appeals (claim_id, submitted_by, message, status, created_at) VALUES (?,?,?,'pending',?)",
-            (claim_id, submitted_by, message, now)
+            (claim_id, submitted_by, message, now),
         )
         conn.execute(
             "INSERT INTO appeal_messages (claim_id, sender, sender_role, message, created_at) VALUES (?,?,?,?,?)",
-            (claim_id, submitted_by, "employee", message, now)
+            (claim_id, submitted_by, "employee", message, now),
         )
 
 
 def reply_to_appeal(claim_id: str, reviewer: str, role: str, message: str) -> None:
     now = datetime.utcnow().isoformat()
     with _conn() as conn:
-        conn.execute(
-            "UPDATE appeals SET status = 'responded' WHERE claim_id = ?",
-            (claim_id,)
-        )
+        conn.execute("UPDATE appeals SET status = 'responded' WHERE claim_id = ?", (claim_id,))
         conn.execute(
             "INSERT INTO appeal_messages (claim_id, sender, sender_role, message, created_at) VALUES (?,?,?,?,?)",
-            (claim_id, reviewer, role, message, now)
+            (claim_id, reviewer, role, message, now),
         )
 
 
 def get_appeal_thread(claim_id: str) -> list[dict]:
     with _conn() as conn:
-        rows = conn.execute(
+        return conn.execute(
             "SELECT * FROM appeal_messages WHERE claim_id = ? ORDER BY created_at ASC",
-            (claim_id,)
+            (claim_id,),
         ).fetchall()
-    return [dict(r) for r in rows]
 
 
 def get_appeals(role: str = "reviewer") -> list[dict]:
     with _conn() as conn:
-        rows = conn.execute("SELECT * FROM appeals ORDER BY created_at DESC").fetchall()
-    return [dict(r) for r in rows]
+        return conn.execute("SELECT * FROM appeals ORDER BY created_at DESC").fetchall()
 
 
-# ── AI logs ──────────────────────────────────────────────────────────────────
+# ── AI logs ───────────────────────────────────────────────────────────────────
 
 def log_ai_call(
     call_type: str,
@@ -256,7 +289,6 @@ def log_ai_call(
 
 def get_ai_logs(limit: int = 100) -> list[dict]:
     with _conn() as conn:
-        rows = conn.execute(
+        return conn.execute(
             "SELECT * FROM ai_logs ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
-    return [dict(r) for r in rows]

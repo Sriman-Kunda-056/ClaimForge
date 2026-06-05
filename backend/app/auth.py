@@ -1,4 +1,5 @@
 import secrets
+from .database import save_token, get_token, delete_token
 
 USERS: dict[str, dict] = {
     "employee": {"password": "demo123",  "role": "employee",  "name": "Alex Employee",  "member_id": "EMP_DEMO"},
@@ -7,17 +8,26 @@ USERS: dict[str, dict] = {
     "ai_agent": {"password": "agent123", "role": "ai_agent",  "name": "AI Agent",        "member_id": None},
 }
 
-_tokens: dict[str, dict] = {}
-
 
 def login(username: str, password: str) -> str | None:
     user = USERS.get(username)
     if not user or user["password"] != password:
         return None
     token = secrets.token_hex(20)
-    _tokens[token] = {"username": username, **user}
+    save_token(token, {"username": username, **user})
     return token
 
 
 def get_user(token: str) -> dict | None:
-    return _tokens.get(token)
+    row = get_token(token)
+    if not row:
+        return None
+    username = row["username"]
+    user = USERS.get(username)
+    if not user:
+        return None
+    return {"username": username, **user}
+
+
+def logout(token: str) -> None:
+    delete_token(token)

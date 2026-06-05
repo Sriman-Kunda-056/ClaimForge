@@ -9,5 +9,8 @@ pytest>=8.0
 # --- AI / LLM ---
 openai>=1.30          # OpenAI-compatible client (Groq / Together / Ollama)
 
-# --- optional: PDF text extraction (pip install pymupdf) ---
-# pymupdf>=1.24
+# --- database ---
+libsql-experimental>=0.0.34   # Turso cloud SQLite (falls back to local sqlite3 if env vars not set)
+
+# --- document extraction ---
+pymupdf>=1.24         # PDF text layer extraction for the /extract endpoint
