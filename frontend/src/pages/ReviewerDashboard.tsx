@@ -126,24 +126,76 @@ export default function ReviewerDashboard() {
           {/* Detail panel */}
           <div className="xl:col-span-2">
             {selected ? (
-              <div className="space-y-3 sticky top-20">
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Claim Details</p>
-                  <dl className="space-y-1.5 text-sm">
-                    {[
-                      ['Member', selected.claim.member_name],
-                      ['ID', selected.claim.member_id],
-                      ['Treatment', selected.claim.treatment_date],
-                      ['Hospital', (selected.claim.hospital as string | undefined) ?? 'Not specified'],
-                      ['Submitted by', String((selected as unknown as Record<string, unknown>).submitted_by ?? '—')],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex gap-2">
-                        <dt className="text-gray-400 w-24 shrink-0">{k}</dt>
-                        <dd className="text-gray-700 font-medium">{v}</dd>
+              <div className="space-y-3 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+                  {/* Basic info */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Claim Details</p>
+                    <dl className="space-y-1.5 text-sm">
+                      {[
+                        ['Member', selected.claim.member_name],
+                        ['ID', selected.claim.member_id],
+                        ['Treatment Date', selected.claim.treatment_date],
+                        ['Claimed Amount', `₹${selected.claim.claim_amount.toLocaleString('en-IN')}`],
+                        ['Hospital', (selected.claim.hospital as string | undefined) ?? 'Not specified'],
+                        ['Cashless', selected.claim.cashless_request ? 'Yes' : 'No'],
+                        ['Pre-authorized', selected.claim.pre_authorized ? 'Yes' : 'No'],
+                        ['Submitted by', String((selected as unknown as Record<string, unknown>).submitted_by ?? '—')],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex gap-2">
+                          <dt className="text-gray-400 w-28 shrink-0">{k}</dt>
+                          <dd className="text-gray-700 font-medium">{String(v)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+
+                  {/* Prescription */}
+                  {(() => {
+                    const p = selected.claim.prescription as Record<string, unknown> | undefined;
+                    if (!p) return <p className="text-xs text-red-500 italic">No prescription submitted</p>;
+                    return (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prescription</p>
+                        <dl className="space-y-1.5 text-sm">
+                          {p.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(p.doctor_name)}</dd></div>}
+                          {p.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(p.doctor_reg)}</dd></div>}
+                          {p.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(p.diagnosis)}</dd></div>}
+                          {Array.isArray(p.medicines_prescribed) && p.medicines_prescribed.length > 0 && (
+                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Medicines</dt><dd className="text-gray-700">{(p.medicines_prescribed as string[]).join(', ')}</dd></div>
+                          )}
+                          {Array.isArray(p.procedures) && p.procedures.length > 0 && (
+                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Procedures</dt><dd className="text-gray-700">{(p.procedures as string[]).join(', ')}</dd></div>
+                          )}
+                          {Array.isArray(p.tests_prescribed) && p.tests_prescribed.length > 0 && (
+                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Tests</dt><dd className="text-gray-700">{(p.tests_prescribed as string[]).join(', ')}</dd></div>
+                          )}
+                          {p.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(p.treatment)}</dd></div>}
+                        </dl>
                       </div>
-                    ))}
-                  </dl>
+                    );
+                  })()}
+
+                  {/* Bill items */}
+                  {(() => {
+                    const bill = selected.claim.bill as Record<string, number> | undefined;
+                    if (!bill || Object.keys(bill).length === 0) return null;
+                    return (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bill Items</p>
+                        <dl className="space-y-1 text-sm">
+                          {Object.entries(bill).map(([k, v]) => (
+                            <div key={k} className="flex gap-2 justify-between">
+                              <dt className="text-gray-500 capitalize">{k.replace(/_/g, ' ')}</dt>
+                              <dd className="text-gray-700 font-medium">₹{Number(v).toLocaleString('en-IN')}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    );
+                  })()}
                 </div>
+
                 <DecisionPanel
                   decision={selected.decision}
                   claimedAmount={selected.claim.claim_amount}

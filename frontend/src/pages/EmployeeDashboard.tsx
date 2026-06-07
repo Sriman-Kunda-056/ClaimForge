@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adjudicate, getClaims } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Claim, ClaimRecord, Decision, DecisionType } from '../types';
@@ -32,6 +32,9 @@ export default function EmployeeDashboard() {
 
   const [history, setHistory] = useState<ClaimRecord[]>([]);
   const [histLoading, setHistLoading] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHistLoading(true);
@@ -60,6 +63,7 @@ export default function EmployeeDashboard() {
       const rec: ClaimRecord = { id: result.claim_id, submittedAt: new Date(), claim, decision: result };
       setDecision(result); setSubmittedClaim(claim);
       setHistory(h => [rec, ...h]);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setLoading(false); }
   }
@@ -75,8 +79,10 @@ export default function EmployeeDashboard() {
       <div className="flex flex-1 max-w-7xl mx-auto w-full px-4 py-6 gap-5">
         {/* Left sidebar — test cases */}
         <aside className="w-64 shrink-0">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 px-1">Quick Load Test Cases</p>
-          <TestCasesSidebar onLoad={loadTestCase} activeIdx={activeCaseIdx} />
+          <div className="sticky top-4 max-h-[calc(100vh-5rem)] overflow-y-auto pr-1 space-y-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 px-1">Quick Load Test Cases</p>
+            <TestCasesSidebar onLoad={loadTestCase} activeIdx={activeCaseIdx} />
+          </div>
         </aside>
 
         {/* Main */}
@@ -99,7 +105,7 @@ export default function EmployeeDashboard() {
                 <ClaimForm key={formKey} initialValues={formValues} extractedFields={extractedFields as never} onSubmit={handleSubmit} loading={loading} autoFillUser={activeCaseIdx === null} />
               </div>
 
-              <div>
+              <div ref={resultRef}>
                 <h2 className="text-base font-semibold text-gray-700 mb-4">Decision Result</h2>
                 {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm mb-4">{error}</div>}
                 {decision && submittedClaim ? (
@@ -141,23 +147,86 @@ export default function EmployeeDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {history.map((rec, i) => (
-                        <tr key={rec.id} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-400">{rec.id.slice(0, 20)}</td>
-                          <td className="px-4 py-3 font-medium text-gray-700">{rec.claim.member_name}</td>
-                          <td className="px-4 py-3 text-gray-500">{rec.claim.treatment_date}</td>
-                          <td className="px-4 py-3 text-gray-700">₹{rec.claim.claim_amount.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3 font-semibold text-gray-700">₹{rec.decision.approved_amount.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[rec.decision.decision]}`}>
-                              {rec.decision.decision.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 text-xs">
-                            {rec.submittedAt instanceof Date ? rec.submittedAt.toLocaleTimeString() : String(rec.submittedAt).slice(11, 19)}
-                          </td>
-                        </tr>
-                      ))}
+                      {history.map((rec, i) => {
+                        const presc = rec.claim.prescription as Record<string, unknown> | undefined;
+                        const bill = rec.claim.bill as Record<string, number> | undefined;
+                        const isOpen = expandedRow === rec.id;
+                        return (
+                          <>
+                            <tr
+                              key={rec.id}
+                              onClick={() => setExpandedRow(isOpen ? null : rec.id)}
+                              className={`border-b border-gray-100 cursor-pointer hover:bg-blue-50/40 transition-colors ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}
+                            >
+                              <td className="px-4 py-3 font-mono text-xs text-gray-400">{rec.id.slice(0, 20)}</td>
+                              <td className="px-4 py-3 font-medium text-gray-700">{rec.claim.member_name}</td>
+                              <td className="px-4 py-3 text-gray-500">{rec.claim.treatment_date}</td>
+                              <td className="px-4 py-3 text-gray-700">₹{rec.claim.claim_amount.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3 font-semibold text-gray-700">₹{rec.decision.approved_amount.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[rec.decision.decision]}`}>
+                                  {rec.decision.decision.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-400 text-xs">
+                                {rec.submittedAt instanceof Date ? rec.submittedAt.toLocaleTimeString() : String(rec.submittedAt).slice(11, 19)}
+                              </td>
+                            </tr>
+                            {isOpen && (
+                              <tr key={`${rec.id}-detail`} className="bg-blue-50/30">
+                                <td colSpan={7} className="px-6 py-4">
+                                  <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                                    {presc && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prescription</p>
+                                        <dl className="space-y-1">
+                                          {presc.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(presc.doctor_name)}</dd></div>}
+                                          {presc.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(presc.doctor_reg)}</dd></div>}
+                                          {presc.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(presc.diagnosis)}</dd></div>}
+                                          {Array.isArray(presc.medicines_prescribed) && presc.medicines_prescribed.length > 0 && (
+                                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Medicines</dt><dd className="text-gray-700">{(presc.medicines_prescribed as string[]).join(', ')}</dd></div>
+                                          )}
+                                          {Array.isArray(presc.procedures) && presc.procedures.length > 0 && (
+                                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Procedures</dt><dd className="text-gray-700">{(presc.procedures as string[]).join(', ')}</dd></div>
+                                          )}
+                                          {Array.isArray(presc.tests_prescribed) && presc.tests_prescribed.length > 0 && (
+                                            <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Tests</dt><dd className="text-gray-700">{(presc.tests_prescribed as string[]).join(', ')}</dd></div>
+                                          )}
+                                          {presc.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(presc.treatment)}</dd></div>}
+                                        </dl>
+                                      </div>
+                                    )}
+                                    {bill && Object.keys(bill).length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Bill Items</p>
+                                        <dl className="space-y-1">
+                                          {Object.entries(bill).map(([k, v]) => (
+                                            <div key={k} className="flex gap-2">
+                                              <dt className="text-gray-400 w-28 shrink-0 capitalize">{k.replace(/_/g, ' ')}</dt>
+                                              <dd className="text-gray-700 font-medium">₹{Number(v).toLocaleString('en-IN')}</dd>
+                                            </div>
+                                          ))}
+                                        </dl>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Decision Details</p>
+                                      <dl className="space-y-1">
+                                        <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Confidence</dt><dd className="text-gray-700">{Math.round(rec.decision.confidence_score * 100)}%</dd></div>
+                                        {rec.decision.rejection_reasons?.length > 0 && (
+                                          <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reasons</dt><dd className="text-red-600">{rec.decision.rejection_reasons.join(', ')}</dd></div>
+                                        )}
+                                        {rec.claim.cashless_request && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Cashless</dt><dd className="text-gray-700">{rec.decision.cashless_approved ? 'Approved' : 'Requested'}</dd></div>}
+                                        {rec.claim.hospital && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Hospital</dt><dd className="text-gray-700">{String(rec.claim.hospital)}</dd></div>}
+                                      </dl>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
