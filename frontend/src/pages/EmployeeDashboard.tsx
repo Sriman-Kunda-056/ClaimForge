@@ -180,9 +180,9 @@ export default function EmployeeDashboard() {
                                       <div>
                                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prescription</p>
                                         <dl className="space-y-1">
-                                          {presc.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(presc.doctor_name)}</dd></div>}
-                                          {presc.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(presc.doctor_reg)}</dd></div>}
-                                          {presc.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(presc.diagnosis)}</dd></div>}
+                                          {!!presc.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(presc.doctor_name)}</dd></div>}
+                                          {!!presc.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(presc.doctor_reg)}</dd></div>}
+                                          {!!presc.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(presc.diagnosis)}</dd></div>}
                                           {Array.isArray(presc.medicines_prescribed) && presc.medicines_prescribed.length > 0 && (
                                             <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Medicines</dt><dd className="text-gray-700">{(presc.medicines_prescribed as string[]).join(', ')}</dd></div>
                                           )}
@@ -192,7 +192,7 @@ export default function EmployeeDashboard() {
                                           {Array.isArray(presc.tests_prescribed) && presc.tests_prescribed.length > 0 && (
                                             <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Tests</dt><dd className="text-gray-700">{(presc.tests_prescribed as string[]).join(', ')}</dd></div>
                                           )}
-                                          {presc.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(presc.treatment)}</dd></div>}
+                                          {!!presc.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(presc.treatment)}</dd></div>}
                                         </dl>
                                       </div>
                                     )}

@@ -158,9 +158,9 @@ export default function ReviewerDashboard() {
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prescription</p>
                         <dl className="space-y-1.5 text-sm">
-                          {p.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(p.doctor_name)}</dd></div>}
-                          {p.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(p.doctor_reg)}</dd></div>}
-                          {p.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(p.diagnosis)}</dd></div>}
+                          {!!p.doctor_name && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Doctor</dt><dd className="text-gray-700">{String(p.doctor_name)}</dd></div>}
+                          {!!p.doctor_reg && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Reg No.</dt><dd className="text-gray-700">{String(p.doctor_reg)}</dd></div>}
+                          {!!p.diagnosis && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Diagnosis</dt><dd className="text-gray-700">{String(p.diagnosis)}</dd></div>}
                           {Array.isArray(p.medicines_prescribed) && p.medicines_prescribed.length > 0 && (
                             <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Medicines</dt><dd className="text-gray-700">{(p.medicines_prescribed as string[]).join(', ')}</dd></div>
                           )}
@@ -170,7 +170,7 @@ export default function ReviewerDashboard() {
                           {Array.isArray(p.tests_prescribed) && p.tests_prescribed.length > 0 && (
                             <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Tests</dt><dd className="text-gray-700">{(p.tests_prescribed as string[]).join(', ')}</dd></div>
                           )}
-                          {p.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(p.treatment)}</dd></div>}
+                          {!!p.treatment && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Treatment</dt><dd className="text-gray-700">{String(p.treatment)}</dd></div>}
                         </dl>
                       </div>
                     );
