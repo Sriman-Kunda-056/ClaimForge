@@ -62,13 +62,17 @@ class _TursoConn:
         if args:
             stmt["args"] = args
 
+        payload = {"requests": [{"type": "execute", "stmt": stmt}, {"type": "close"}]}
         resp = httpx.post(
             self._endpoint,
-            json={"requests": [{"type": "execute", "stmt": stmt}, {"type": "close"}]},
+            json=payload,
             headers=self._headers,
             timeout=15,
         )
-        resp.raise_for_status()
+        if not resp.is_success:
+            raise RuntimeError(
+                f"Turso {resp.status_code} — SQL: {sql[:120]} — response: {resp.text[:400]}"
+            )
 
         result = resp.json()["results"][0]["response"]["result"]
         cols = [c["name"] for c in result.get("cols", [])]
