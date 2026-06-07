@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adjudicate, getClaims } from '../api';
 import { useAuth } from '../context/AuthContext';
+import type { Claim, ClaimRecord, Decision, DecisionType } from '../types';
 import Navbar from '../components/Navbar';
 import DocumentUpload from '../components/DocumentUpload';
 import ClaimForm from '../components/ClaimForm';
@@ -8,7 +9,7 @@ import DecisionPanel from '../components/DecisionPanel';
 import TestCasesSidebar from '../components/TestCasesSidebar';
 import { TEST_CASES } from '../testCases';
 
-const STATUS_BADGE = {
+const STATUS_BADGE: Record<DecisionType, string> = {
   APPROVED:      'bg-green-100 text-green-700',
   REJECTED:      'bg-red-100 text-red-700',
   PARTIAL:       'bg-amber-100 text-amber-700',
@@ -17,34 +18,32 @@ const STATUS_BADGE = {
 
 export default function EmployeeDashboard() {
   const { token } = useAuth();
-  const [tab, setTab] = useState('submit');
+  const [tab, setTab] = useState<'submit' | 'history'>('submit');
 
   const [formKey, setFormKey] = useState(0);
-  const [formValues, setFormValues] = useState({});
-  const [extractedFields, setExtractedFields] = useState(null);
-  const [activeCaseIdx, setActiveCaseIdx] = useState(null);
+  const [formValues, setFormValues] = useState<Partial<Claim>>({});
+  const [extractedFields, setExtractedFields] = useState<Record<string, unknown> | null>(null);
+  const [activeCaseIdx, setActiveCaseIdx] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [decision, setDecision] = useState(null);
-  const [submittedClaim, setSubmittedClaim] = useState(null);
+  const [decision, setDecision] = useState<Decision | null>(null);
+  const [submittedClaim, setSubmittedClaim] = useState<Claim | null>(null);
 
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<ClaimRecord[]>([]);
   const [histLoading, setHistLoading] = useState(false);
 
   useEffect(() => {
-    let active = true;
     setHistLoading(true);
     getClaims(token)
-      .then(rows => { if (active) setHistory(rows.map(r => ({
+      .then(rows => setHistory((rows as { claim_id: string; claim_json: Claim; decision_json: Decision; submitted_at: string }[]).map(r => ({
         id: r.claim_id, submittedAt: new Date(r.submitted_at), claim: r.claim_json, decision: r.decision_json,
-      }))) })
+      }))))
       .catch(() => {})
-      .finally(() => { if (active) setHistLoading(false); });
-    return () => { active = false; };
+      .finally(() => setHistLoading(false));
   }, [token]);
 
-  function loadTestCase(idx) {
+  function loadTestCase(idx: number) {
     setActiveCaseIdx(idx);
     setFormValues(TEST_CASES[idx].claim);
     setExtractedFields(null);
@@ -54,26 +53,14 @@ export default function EmployeeDashboard() {
     setTab('submit');
   }
 
-  async function handleSubmit(claim) {
+  async function handleSubmit(claim: Claim) {
     setLoading(true); setError(''); setDecision(null);
     try {
-      // When a test case is loaded:
-      // 1. Use an isolated member ID so repeated submissions don't accumulate same-day counts.
-      // 2. Restore previous_claims_same_day from the original test case data — the form
-      //    doesn't show this field (it's auto-computed for real claims) but test cases
-      //    like TC008 rely on it to simulate prior same-day submissions.
-      const submittable = activeCaseIdx !== null
-        ? {
-            ...claim,
-            member_id: `TC_${Date.now()}_${claim.member_id}`,
-            previous_claims_same_day: TEST_CASES[activeCaseIdx].claim.previous_claims_same_day ?? 0,
-          }
-        : claim;
-      const result = await adjudicate(submittable, token);
-      const rec = { id: result.claim_id, submittedAt: new Date(), claim, decision: result };
+      const result = await adjudicate(claim, token);
+      const rec: ClaimRecord = { id: result.claim_id, submittedAt: new Date(), claim, decision: result };
       setDecision(result); setSubmittedClaim(claim);
       setHistory(h => [rec, ...h]);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setLoading(false); }
   }
 
@@ -82,7 +69,7 @@ export default function EmployeeDashboard() {
       <Navbar
         tabs={[{ key: 'submit', label: 'New Claim' }, { key: 'history', label: `My Claims (${history.length})` }]}
         activeTab={tab}
-        onTabChange={k => setTab(k)}
+        onTabChange={k => setTab(k as 'submit' | 'history')}
       />
 
       <div className="flex flex-1 max-w-7xl mx-auto w-full px-4 py-6 gap-5">
@@ -107,9 +94,9 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {/* Document upload with AI extraction */}
-                <DocumentUpload onExtracted={f => setExtractedFields(f)} />
+                <DocumentUpload onExtracted={f => setExtractedFields(f as Record<string, unknown>)} />
 
-                <ClaimForm key={formKey} initialValues={formValues} extractedFields={extractedFields} onSubmit={handleSubmit} loading={loading} autoFillUser={activeCaseIdx === null} />
+                <ClaimForm key={formKey} initialValues={formValues} extractedFields={extractedFields as never} onSubmit={handleSubmit} loading={loading} autoFillUser={activeCaseIdx === null} />
               </div>
 
               <div>

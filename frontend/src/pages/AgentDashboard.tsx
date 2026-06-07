@@ -4,8 +4,22 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import EvalRunner from '../components/EvalRunner';
 
+interface AiLog {
+  id: number;
+  call_type: string;
+  model: string;
+  prompt_preview: string;
+  response_preview: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  latency_ms: number;
+  status: string;
+  error: string | null;
+  created_at: string;
+}
 
-function LogRow({ log }) {
+
+function LogRow({ log }: { log: AiLog }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -96,27 +110,25 @@ function LogRow({ log }) {
 
 export default function AgentDashboard() {
   const { token } = useAuth();
-  const [tab, setTab] = useState('logs');
-  const [logs, setLogs] = useState([]);
+  const [tab, setTab] = useState<'logs' | 'eval'>('logs');
+  const [logs, setLogs] = useState<AiLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState('all');
+  const [filterType, setFilterType] = useState<'all' | 'extraction' | 'explanation'>('all');
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  const loadLogs = () => {
+  function loadLogs() {
     Promise.all([getAiLogs(token, 200), getStats(token)])
-      .then(([l]) => setLogs(l))
+      .then(([l]) => { setLogs(l as AiLog[]); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  };
+  }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadLogs(); }, [token]);
 
   useEffect(() => {
     if (!autoRefresh) return;
     const id = setInterval(loadLogs, 3000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, token]);
 
   const filtered = filterType === 'all' ? logs : logs.filter(l => l.call_type === filterType);
@@ -129,7 +141,7 @@ export default function AgentDashboard() {
       <Navbar
         tabs={[{ key: 'logs', label: `AI Activity Log (${logs.length})` }, { key: 'eval', label: 'Evaluation' }]}
         activeTab={tab}
-        onTabChange={k => setTab(k)}
+        onTabChange={k => setTab(k as 'logs' | 'eval')}
       />
 
       <div className="max-w-7xl mx-auto w-full px-4 py-6 space-y-5">
@@ -178,7 +190,7 @@ export default function AgentDashboard() {
             {/* Controls */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex gap-2">
-                {['all', 'extraction', 'explanation'].map(f => (
+                {(['all', 'extraction', 'explanation'] as const).map(f => (
                   <button key={f} onClick={() => setFilterType(f)}
                     className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors
                       ${filterType === f ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}>

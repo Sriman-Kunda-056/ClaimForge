@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { getClaims, getStats, overrideClaim } from '../api';
 import { useAuth } from '../context/AuthContext';
+import type { ClaimRecord, Decision, DecisionType } from '../types';
 import Navbar from '../components/Navbar';
 import PolicyEditor from '../components/PolicyEditor';
 import DecisionPanel from '../components/DecisionPanel';
 
-const BADGE = {
+const BADGE: Record<DecisionType, string> = {
   APPROVED:      'bg-green-100 text-green-700',
   REJECTED:      'bg-red-100 text-red-700',
   PARTIAL:       'bg-amber-100 text-amber-700',
   MANUAL_REVIEW: 'bg-orange-100 text-orange-700',
 };
 
-const DECISION_COLOR = {
+const DECISION_COLOR: Record<string, string> = {
   APPROVED:      'bg-green-500',
   REJECTED:      'bg-red-500',
   PARTIAL:       'bg-amber-500',
@@ -21,33 +22,33 @@ const DECISION_COLOR = {
 
 export default function AdminDashboard() {
   const { token, user } = useAuth();
-  const [tab, setTab] = useState('overview');
-  const [claims, setClaims] = useState([]);
-  const [stats, setStats] = useState({});
+  const [tab, setTab] = useState<'overview' | 'claims' | 'policy'>('overview');
+  const [claims, setClaims] = useState<ClaimRecord[]>([]);
+  const [stats, setStats] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<ClaimRecord | null>(null);
 
   useEffect(() => {
     Promise.all([getClaims(token), getStats(token)])
       .then(([rows, s]) => {
-        setClaims(rows.map(r => ({
+        setClaims((rows as { claim_id: string; claim_json: ClaimRecord['claim']; decision_json: Decision; submitted_at: string; submitted_by: string }[]).map(r => ({
           id: r.claim_id, submittedAt: new Date(r.submitted_at), claim: r.claim_json, decision: r.decision_json,
           submitted_by: r.submitted_by,
-        })));
+        } as ClaimRecord & { submitted_by: string })));
         setStats(s);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
 
-  async function handleOverride(claimId, action, reason) {
+  async function handleOverride(claimId: string, action: 'APPROVED' | 'REJECTED', reason: string) {
     await overrideClaim(claimId, action, reason, token);
     setClaims(c => c.map(r => r.id === claimId ? { ...r, decision: { ...r.decision, decision: action } } : r));
     if (selected?.id === claimId) setSelected(s => s ? { ...s, decision: { ...s.decision, decision: action } } : s);
   }
 
-  const byDecision = stats.by_decision ?? {};
-  const total = stats.total_claims ?? 0;
+  const byDecision = (stats.by_decision as Record<string, number>) ?? {};
+  const total = (stats.total_claims as number) ?? 0;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -58,7 +59,7 @@ export default function AdminDashboard() {
           { key: 'policy', label: 'Policy' },
         ]}
         activeTab={tab}
-        onTabChange={k => setTab(k)}
+        onTabChange={k => setTab(k as 'overview' | 'claims' | 'policy')}
       />
 
       <div className="max-w-7xl mx-auto w-full px-4 py-6 space-y-5">
@@ -93,7 +94,7 @@ export default function AdminDashboard() {
                       return (
                         <div key={decision}>
                           <div className="flex items-center justify-between text-sm mb-1">
-                            <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${BADGE[decision] ?? 'bg-gray-100 text-gray-700'}`}>
+                            <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${BADGE[decision as DecisionType] ?? 'bg-gray-100 text-gray-700'}`}>
                               {decision.replace('_', ' ')}
                             </span>
                             <span className="text-gray-500">{count} ({pct}%)</span>
@@ -144,7 +145,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-2.5 text-gray-700">₹{rec.claim.claim_amount.toLocaleString('en-IN')}</td>
                       <td className="px-4 py-2.5 font-semibold text-gray-700">₹{rec.decision.approved_amount.toLocaleString('en-IN')}</td>
                       <td className="px-4 py-2.5"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE[rec.decision.decision]}`}>{rec.decision.decision.replace('_', ' ')}</span></td>
-                      <td className="px-4 py-2.5 text-gray-400 text-xs">{String(rec.submitted_by ?? '—')}</td>
+                      <td className="px-4 py-2.5 text-gray-400 text-xs">{String((rec as unknown as Record<string,unknown>).submitted_by ?? '—')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -171,7 +172,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-2.5 text-gray-500 text-xs">{rec.claim.treatment_date}</td>
                       <td className="px-4 py-2.5 text-gray-700">₹{rec.claim.claim_amount.toLocaleString('en-IN')}</td>
                       <td className="px-4 py-2.5"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE[rec.decision.decision]}`}>{rec.decision.decision.replace('_',' ')}</span></td>
-                      <td className="px-4 py-2.5 text-gray-400 text-xs">{String(rec.submitted_by ?? '—')}</td>
+                      <td className="px-4 py-2.5 text-gray-400 text-xs">{String((rec as unknown as Record<string,unknown>).submitted_by ?? '—')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,7 +181,7 @@ export default function AdminDashboard() {
             <div className="xl:col-span-2">
               {selected ? (
                 <div className="sticky top-20">
-                  <DecisionPanel decision={selected.decision} claimedAmount={selected.claim.claim_amount} claimId={selected.id} role={user.role} onOverride={handleOverride} />
+                  <DecisionPanel decision={selected.decision} claimedAmount={selected.claim.claim_amount} claimId={selected.id} role={user!.role} onOverride={handleOverride} />
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-dashed border-gray-200 p-12 text-center text-gray-300 sticky top-20">

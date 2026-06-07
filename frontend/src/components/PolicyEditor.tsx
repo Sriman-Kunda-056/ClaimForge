@@ -2,7 +2,36 @@ import { useEffect, useState } from 'react';
 import { getPolicy, updatePolicy } from '../api';
 import { useAuth } from '../context/AuthContext';
 
-function NInput({ label, value, onChange, prefix, suffix, type = 'number', min }) {
+interface Policy {
+  policy_id: string;
+  policy_name: string;
+  effective_date: string;
+  coverage_details: {
+    annual_limit: number;
+    per_claim_limit: number;
+    family_floater_limit: number;
+    consultation_fees: { covered: boolean; sub_limit: number; copay_percentage: number; network_discount: number };
+    diagnostic_tests: { covered: boolean; sub_limit: number; pre_authorization_required: boolean };
+    pharmacy: { covered: boolean; sub_limit: number; generic_drugs_mandatory: boolean; branded_drugs_copay: number };
+    dental: { covered: boolean; sub_limit: number; routine_checkup_limit: number; cosmetic_procedures: boolean };
+    vision: { covered: boolean; sub_limit: number; eye_test_covered: boolean; glasses_contact_lenses: boolean; lasik_surgery: boolean };
+    alternative_medicine: { covered: boolean; sub_limit: number; therapy_sessions_limit: number };
+  };
+  waiting_periods: {
+    initial_waiting: number;
+    pre_existing_diseases: number;
+    maternity: number;
+    specific_ailments: { diabetes: number; hypertension: number; joint_replacement: number };
+  };
+  exclusions: string[];
+  network_hospitals: string[];
+  cashless_facilities: { available: boolean; network_only: boolean; pre_approval_required: boolean; instant_approval_limit: number };
+}
+
+function NInput({ label, value, onChange, prefix, suffix, type = 'number', min }: {
+  label: string; value: number; onChange: (v: number) => void;
+  prefix?: string; suffix?: string; type?: string; min?: number;
+}) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
@@ -21,7 +50,7 @@ function NInput({ label, value, onChange, prefix, suffix, type = 'number', min }
   );
 }
 
-function Toggle({ label, checked, onChange }) {
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center gap-3 cursor-pointer select-none">
       <button
@@ -36,7 +65,7 @@ function Toggle({ label, checked, onChange }) {
   );
 }
 
-function ListEditor({ label, items, onChange }) {
+function ListEditor({ label, items, onChange }: { label: string; items: string[]; onChange: (v: string[]) => void }) {
   const [draft, setDraft] = useState('');
 
   function add() {
@@ -69,7 +98,7 @@ function ListEditor({ label, items, onChange }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <h3 className="text-sm font-semibold text-gray-600 border-b border-gray-100 pb-2">{title}</h3>
@@ -80,36 +109,36 @@ function Section({ title, children }) {
 
 export default function PolicyEditor() {
   const { token } = useAuth();
-  const [policy, setPolicy] = useState(null);
+  const [policy, setPolicy] = useState<Policy | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getPolicy(token).then(p => setPolicy(p)).finally(() => setLoading(false));
+    getPolicy(token).then(p => setPolicy(p as unknown as Policy)).finally(() => setLoading(false));
   }, [token]);
 
   async function handleSave() {
     if (!policy) return;
     setSaving(true); setError(''); setSaved(false);
     try {
-      await updatePolicy(policy, token);
+      await updatePolicy(policy as unknown as Record<string, unknown>, token);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
+    } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setSaving(false);
     }
   }
 
-  function set(path, value) {
+  function set(path: string[], value: unknown) {
     setPolicy(prev => {
       if (!prev) return prev;
       const next = JSON.parse(JSON.stringify(prev));
-      let node = next;
-      for (let i = 0; i < path.length - 1; i++) node = node[path[i]];
+      let node: Record<string, unknown> = next;
+      for (let i = 0; i < path.length - 1; i++) node = node[path[i]] as Record<string, unknown>;
       node[path[path.length - 1]] = value;
       return next;
     });

@@ -1,19 +1,28 @@
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext';
 
-const ROLE_BADGE = {
-  employee: 'bg-blue-100 text-blue-700',
-  reviewer: 'bg-purple-100 text-purple-700',
-  admin: 'bg-red-100 text-red-700',
-  ai_agent: 'bg-indigo-100 text-indigo-700',
+const ROLE_BADGE: Record<string, string> = {
+  employee:  'bg-blue-100 text-blue-700',
+  reviewer:  'bg-purple-100 text-purple-700',
+  admin:     'bg-red-100 text-red-700',
+  ai_agent:  'bg-indigo-100 text-indigo-700',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  employee: 'Employee',
+  reviewer: 'Reviewer',
+  admin: 'Admin',
+  ai_agent: 'AI Agent',
+};
+
+interface Props {
+  tabs?: { key: string; label: string }[];
+  activeTab?: string;
+  onTabChange?: (key: string) => void;
 }
 
-const ROLE_LABEL = {
-  employee: 'Employee', reviewer: 'Reviewer', admin: 'Admin', ai_agent: 'AI Agent',
-}
-
-export default function Navbar({ tabs, activeTab, onTabChange }) {
-  const { user, logout } = useAuth()
-  if (!user) return null
+export default function Navbar({ tabs, activeTab, onTabChange }: Props) {
+  const { user, logout } = useAuth();
+  if (!user) return null;
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -26,17 +35,22 @@ export default function Navbar({ tabs, activeTab, onTabChange }) {
           </div>
           <span className="font-semibold text-gray-800 hidden sm:block">OPD Adjudication</span>
         </div>
+
         {tabs && onTabChange && (
           <nav className="flex items-center gap-1">
             {tabs.map(t => (
-              <button key={t.key} onClick={() => onTabChange(t.key)}
+              <button
+                key={t.key}
+                onClick={() => onTabChange(t.key)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-                  ${activeTab === t.key ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
+                  ${activeTab === t.key ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+              >
                 {t.label}
               </button>
             ))}
           </nav>
         )}
+
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right hidden sm:block">
             <p className="text-xs font-semibold text-gray-700">{user.name}</p>
@@ -50,5 +64,5 @@ export default function Navbar({ tabs, activeTab, onTabChange }) {
         </div>
       </div>
     </header>
-  )
+  );
 }

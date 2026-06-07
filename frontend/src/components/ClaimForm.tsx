@@ -1,11 +1,36 @@
 import { useState, useEffect } from 'react';
+import type { Claim } from '../types';
 import { useAuth } from '../context/AuthContext';
 
-function parseTag(raw) {
+interface ExtractedFields {
+  doctor_name?: string;
+  doctor_reg?: string;
+  diagnosis?: string;
+  medicines_prescribed?: string[];
+  procedures?: string[];
+  tests_prescribed?: string[];
+  treatment?: string;
+  bill_items?: Record<string, number>;
+  total_amount?: number;
+  hospital?: string;
+  patient_name?: string;
+}
+
+interface Props {
+  initialValues?: Partial<Claim>;
+  extractedFields?: ExtractedFields | null;
+  onSubmit: (claim: Claim) => void;
+  loading: boolean;
+  autoFillUser?: boolean;
+}
+
+interface BillLine { key: string; amount: string }
+
+function parseTag(raw: string): string[] {
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-export default function ClaimForm({ initialValues, extractedFields, onSubmit, loading, autoFillUser }) {
+export default function ClaimForm({ initialValues, extractedFields, onSubmit, loading, autoFillUser }: Props) {
   const { user } = useAuth();
   const iv = initialValues ?? {};
 
@@ -29,10 +54,10 @@ export default function ClaimForm({ initialValues, extractedFields, onSubmit, lo
   const [treatment, setTreatment] = useState(p?.treatment ?? '');
   const [noPrescription, setNoPrescription] = useState(!p && Object.keys(iv).length > 0);
 
-  const initBill = Object.keys(iv.bill ?? {}).length
-    ? Object.entries(iv.bill).map(([k, v]) => ({ key: k, amount: String(v) }))
+  const initBill: BillLine[] = Object.keys(iv.bill ?? {}).length
+    ? Object.entries(iv.bill!).map(([k, v]) => ({ key: k, amount: String(v) }))
     : [{ key: '', amount: '' }];
-  const [billLines, setBillLines] = useState(initBill);
+  const [billLines, setBillLines] = useState<BillLine[]>(initBill);
 
   // Apply AI-extracted fields when they arrive
   useEffect(() => {
@@ -56,13 +81,13 @@ export default function ClaimForm({ initialValues, extractedFields, onSubmit, lo
   }, [extractedFields]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addLine() { setBillLines(l => [...l, { key: '', amount: '' }]); }
-  function removeLine(i) { setBillLines(l => l.filter((_, idx) => idx !== i)); }
-  function setLine(i, field, val) {
+  function removeLine(i: number) { setBillLines(l => l.filter((_, idx) => idx !== i)); }
+  function setLine(i: number, field: 'key' | 'amount', val: string) {
     setBillLines(l => l.map((line, idx) => idx === i ? { ...line, [field]: val } : line));
   }
 
-  function buildClaim() {
-    const bill = {};
+  function buildClaim(): Claim {
+    const bill: Record<string, number> = {};
     billLines.forEach(({ key, amount }) => {
       const k = key.trim().replace(/\s+/g, '_').toLowerCase();
       const v = parseFloat(amount);
@@ -93,7 +118,7 @@ export default function ClaimForm({ initialValues, extractedFields, onSubmit, lo
     };
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     onSubmit(buildClaim());
   }
@@ -231,7 +256,7 @@ export default function ClaimForm({ initialValues, extractedFields, onSubmit, lo
   );
 }
 
-function Field({ label, children, className }) {
+function Field({ label, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
@@ -240,7 +265,7 @@ function Field({ label, children, className }) {
   );
 }
 
-function Input({ className = '', onValueChange, ...props }) {
+function Input({ className = '', onValueChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> & { onValueChange?: (v: string) => void; className?: string }) {
   return (
     <input
       className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${className}`}
@@ -250,7 +275,7 @@ function Input({ className = '', onValueChange, ...props }) {
   );
 }
 
-function Toggle({ checked, onChange, label }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600">
       <button

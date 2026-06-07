@@ -1,30 +1,39 @@
 import { useState } from 'react';
+import type { Decision, DecisionType } from '../types';
 import AppealThread from './AppealThread';
 
-const VERDICT_CONFIG = {
+const VERDICT_CONFIG: Record<DecisionType, { bg: string; text: string; border: string; label: string }> = {
   APPROVED:      { bg: 'bg-green-50',  text: 'text-green-800',  border: 'border-green-200',  label: 'Approved' },
   REJECTED:      { bg: 'bg-red-50',    text: 'text-red-800',    border: 'border-red-200',    label: 'Rejected' },
   PARTIAL:       { bg: 'bg-amber-50',  text: 'text-amber-800',  border: 'border-amber-200',  label: 'Partial Approval' },
   MANUAL_REVIEW: { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-orange-200', label: 'Manual Review' },
 };
 
-const CONF_COLOR = (score) =>
+const CONF_COLOR = (score: number) =>
   score >= 0.9 ? 'bg-green-500' : score >= 0.75 ? 'bg-amber-500' : 'bg-red-500';
 
-function fmt(n) {
+function fmt(n: number) {
   return '₹' + n.toLocaleString('en-IN');
 }
 
-function pretty(key) {
+function pretty(key: string) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default function DecisionPanel({ decision, claimedAmount, claimId, role, onOverride }) {
+interface Props {
+  decision: Decision;
+  claimedAmount: number;
+  claimId?: string;
+  role?: string;
+  onOverride?: (claimId: string, action: 'APPROVED' | 'REJECTED', reason: string) => Promise<void>;
+}
+
+export default function DecisionPanel({ decision, claimedAmount, claimId, role, onOverride }: Props) {
   const cfg = VERDICT_CONFIG[decision.decision];
   const pct = Math.round(decision.confidence_score * 100);
 
   const [showOverride, setShowOverride] = useState(false);
-  const [overrideAction, setOverrideAction] = useState('APPROVED');
+  const [overrideAction, setOverrideAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
   const [overrideReason, setOverrideReason] = useState('');
   const [overriding, setOverriding] = useState(false);
 
@@ -202,7 +211,7 @@ export default function DecisionPanel({ decision, claimedAmount, claimId, role, 
             <div className="space-y-3 bg-purple-50 rounded-lg p-4 border border-purple-100">
               <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Reviewer Override</p>
               <div className="flex gap-2">
-                {['APPROVED', 'REJECTED'].map(a => (
+                {(['APPROVED', 'REJECTED'] as const).map(a => (
                   <button
                     key={a}
                     onClick={() => setOverrideAction(a)}

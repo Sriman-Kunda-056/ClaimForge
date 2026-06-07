@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { getPolicy } from '../api';
 
-function pretty(key) {
+function pretty(key: string) {
   return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function ValueNode({ value }) {
+function ValueNode({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>;
   if (typeof value === 'boolean') return <span className={value ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>{String(value)}</span>;
   if (typeof value === 'number') return <span className="text-blue-600 font-mono font-medium">{typeof value === 'number' && value > 100 ? '₹' + value.toLocaleString('en-IN') : value}</span>;
@@ -20,7 +20,7 @@ function ValueNode({ value }) {
   if (typeof value === 'object') {
     return (
       <div className="pl-3 border-l-2 border-gray-100 space-y-1.5 mt-1">
-        {Object.entries(value).map(([k, v]) => (
+        {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
           <div key={k} className="flex gap-3 text-sm">
             <span className="text-gray-400 shrink-0 w-40">{pretty(k)}</span>
             <ValueNode value={v} />
@@ -33,7 +33,7 @@ function ValueNode({ value }) {
 }
 
 export default function PolicyViewer() {
-  const [policy, setPolicy] = useState(null);
+  const [policy, setPolicy] = useState<Record<string, unknown> | null>(null);
   const [err, setErr] = useState('');
 
   useEffect(() => {

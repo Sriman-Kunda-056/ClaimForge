@@ -1,38 +1,41 @@
 import { useEffect, useState } from 'react';
 import { getClaims, getStats, overrideClaim } from '../api';
 import { useAuth } from '../context/AuthContext';
+import type { ClaimRecord, Decision, DecisionType } from '../types';
 import Navbar from '../components/Navbar';
 import DecisionPanel from '../components/DecisionPanel';
 
-const BADGE = {
+const BADGE: Record<DecisionType, string> = {
   APPROVED:      'bg-green-100 text-green-700',
   REJECTED:      'bg-red-100 text-red-700',
   PARTIAL:       'bg-amber-100 text-amber-700',
   MANUAL_REVIEW: 'bg-orange-100 text-orange-700 ring-2 ring-orange-300',
 };
 
+type Filter = 'all' | 'MANUAL_REVIEW' | 'APPROVED' | 'REJECTED' | 'PARTIAL';
+
 export default function ReviewerDashboard() {
   const { token, user } = useAuth();
-  const [tab, setTab] = useState('queue');
-  const [filter, setFilter] = useState('all');
-  const [claims, setClaims] = useState([]);
-  const [stats, setStats] = useState({});
+  const [tab, setTab] = useState<'queue' | 'all'>('queue');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [claims, setClaims] = useState<ClaimRecord[]>([]);
+  const [stats, setStats] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<ClaimRecord | null>(null);
 
   useEffect(() => {
     Promise.all([
       getClaims(token),
       getStats(token),
     ]).then(([rows, s]) => {
-      setClaims(rows.map(r => ({
+      setClaims((rows as { claim_id: string; claim_json: ClaimRecord['claim']; decision_json: Decision; submitted_at: string }[]).map(r => ({
         id: r.claim_id, submittedAt: new Date(r.submitted_at), claim: r.claim_json, decision: r.decision_json,
       })));
       setStats(s);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
-  async function handleOverride(claimId, action, reason) {
+  async function handleOverride(claimId: string, action: 'APPROVED' | 'REJECTED', reason: string) {
     await overrideClaim(claimId, action, reason, token);
     setClaims(c => c.map(r => r.id === claimId ? { ...r, decision: { ...r.decision, decision: action } } : r));
     if (selected?.id === claimId) setSelected(s => s ? { ...s, decision: { ...s.decision, decision: action } } : s);
@@ -46,7 +49,7 @@ export default function ReviewerDashboard() {
       <Navbar
         tabs={[{ key: 'queue', label: `Review Queue (${queue.length})` }, { key: 'all', label: `All Claims (${claims.length})` }]}
         activeTab={tab}
-        onTabChange={k => setTab(k)}
+        onTabChange={k => setTab(k as 'queue' | 'all')}
       />
 
       <div className="max-w-7xl mx-auto w-full px-4 py-6 space-y-5">
@@ -70,7 +73,7 @@ export default function ReviewerDashboard() {
           <div className="xl:col-span-3 space-y-3">
             {tab === 'all' && (
               <div className="flex gap-2 flex-wrap">
-                {['all', 'MANUAL_REVIEW', 'APPROVED', 'REJECTED', 'PARTIAL'].map(f => (
+                {(['all', 'MANUAL_REVIEW', 'APPROVED', 'REJECTED', 'PARTIAL'] as Filter[]).map(f => (
                   <button key={f} onClick={() => setFilter(f)}
                     className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors
                       ${filter === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
@@ -98,7 +101,7 @@ export default function ReviewerDashboard() {
                         <span className="ml-2 text-xs text-gray-400 font-normal">{rec.claim.member_id}</span>
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {rec.claim.treatment_date} · {rec.claim.prescription?.diagnosis ?? 'No diagnosis'} · Submitted by {String(rec.submitted_by ?? 'unknown')}
+                        {rec.claim.treatment_date} · {(rec.claim.prescription as {diagnosis?: string})?.diagnosis ?? 'No diagnosis'} · Submitted by {String((rec as unknown as Record<string, unknown>).submitted_by ?? 'unknown')}
                       </p>
                     </div>
                     <div className="text-right shrink-0 space-y-1">
@@ -131,8 +134,8 @@ export default function ReviewerDashboard() {
                       ['Member', selected.claim.member_name],
                       ['ID', selected.claim.member_id],
                       ['Treatment', selected.claim.treatment_date],
-                      ['Hospital', selected.claim.hospital ?? 'Not specified'],
-                      ['Submitted by', String(selected.submitted_by ?? '—')],
+                      ['Hospital', (selected.claim.hospital as string | undefined) ?? 'Not specified'],
+                      ['Submitted by', String((selected as unknown as Record<string, unknown>).submitted_by ?? '—')],
                     ].map(([k, v]) => (
                       <div key={k} className="flex gap-2">
                         <dt className="text-gray-400 w-24 shrink-0">{k}</dt>
@@ -145,7 +148,7 @@ export default function ReviewerDashboard() {
                   decision={selected.decision}
                   claimedAmount={selected.claim.claim_amount}
                   claimId={selected.id}
-                  role={user.role}
+                  role={user!.role}
                   onOverride={handleOverride}
                 />
               </div>

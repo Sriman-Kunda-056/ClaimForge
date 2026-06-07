@@ -2,8 +2,20 @@ import { useState } from 'react';
 import { adjudicate } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { TEST_CASES } from '../testCases';
+import type { Decision, DecisionType } from '../types';
 
-const BADGE = {
+interface Result {
+  case_id: string;
+  case_name: string;
+  expected: string;
+  got: DecisionType;
+  match: boolean;
+  approved_amount: number;
+  confidence: number;
+  duration_ms: number;
+}
+
+const BADGE: Record<DecisionType, string> = {
   APPROVED:      'bg-green-100 text-green-700',
   REJECTED:      'bg-red-100 text-red-700',
   PARTIAL:       'bg-amber-100 text-amber-700',
@@ -12,7 +24,7 @@ const BADGE = {
 
 export default function EvalRunner() {
   const { token } = useAuth();
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<Result[]>([]);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -21,21 +33,16 @@ export default function EvalRunner() {
     setResults([]);
     setProgress(0);
 
-    // Use a unique run ID so eval submissions never accumulate in real DB history.
-    // Without this, EMP001 on 2024-11-01 builds up ≥2 same-day claims across runs
-    // and triggers the fraud rule, flipping APPROVED → MANUAL_REVIEW.
-    const runId = `EVAL_${Date.now()}`;
-
-    const all = [];
+    const all: Result[] = [];
     for (let i = 0; i < TEST_CASES.length; i++) {
       const tc = TEST_CASES[i];
       const t0 = Date.now();
-      // Isolate each eval run with a unique member_id prefix
-      const claim = { ...tc.claim, member_id: `${runId}_${tc.claim.member_id}` };
-      let decision = null;
+      let decision: Decision | null = null;
       try {
-        decision = await adjudicate(claim, token);
-      } catch { /* network/server error — treat as null decision */ }
+        decision = await adjudicate(tc.claim, token);
+      } catch {
+        decision = null;
+      }
       all.push({
         case_id: tc.case_id,
         case_name: tc.case_name,
@@ -121,7 +128,7 @@ export default function EvalRunner() {
                   <td className="px-4 py-2.5 font-mono text-xs text-gray-400">{r.case_id}</td>
                   <td className="px-4 py-2.5 text-gray-700 max-w-[160px] truncate">{r.case_name}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE[r.expected]}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE[r.expected as DecisionType]}`}>
                       {r.expected.replace('_', ' ')}
                     </span>
                   </td>
@@ -162,7 +169,7 @@ export default function EvalRunner() {
   );
 }
 
-function MetricCard({ label, value, sub, color }) {
+function MetricCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
       <p className="text-xs text-gray-400 mb-1">{label}</p>

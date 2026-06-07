@@ -2,9 +2,23 @@ import { useEffect, useState } from 'react';
 import { getClaimThread, submitAppeal, replyToAppeal } from '../api';
 import { useAuth } from '../context/AuthContext';
 
-export default function AppealThread({ claimId, decisionType }) {
+interface Message {
+  id: number;
+  claim_id: string;
+  sender: string;
+  sender_role: string;
+  message: string;
+  created_at: string;
+}
+
+interface Props {
+  claimId: string;
+  decisionType: string;
+}
+
+export default function AppealThread({ claimId, decisionType }: Props) {
   const { token, user } = useAuth();
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -13,7 +27,7 @@ export default function AppealThread({ claimId, decisionType }) {
   useEffect(() => {
     if (!claimId) return;
     getClaimThread(claimId, token)
-      .then(m => setMessages(m))
+      .then(m => setMessages(m as Message[]))
       .catch(() => {});
   }, [claimId, token]);
 
@@ -32,10 +46,10 @@ export default function AppealThread({ claimId, decisionType }) {
         await replyToAppeal(claimId, draft.trim(), token);
       }
       const updated = await getClaimThread(claimId, token);
-      setMessages(updated);
+      setMessages(updated as Message[]);
       setDraft('');
       setShowAppeal(false);
-    } catch (e) {
+    } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to send');
     } finally {
       setSending(false);

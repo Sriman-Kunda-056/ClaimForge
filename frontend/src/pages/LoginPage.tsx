@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { loginApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import type { AuthUser } from '../context/AuthContext';
 
 const DEMO_CREDS = [
   { username: 'employee', password: 'demo123',  role: 'Employee',  desc: 'Submit claims, view own history',    icon: '👤' },
@@ -16,21 +17,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
       const data = await loginApi(username, password);
-      login(data.user, data.token);
-    } catch (err) {
+      login(data.user as AuthUser, data.token);
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
   }
 
-  function quickLogin(u, p) {
+  function quickLogin(u: string, p: string) {
     setUsername(u);
     setPassword(p);
   }
