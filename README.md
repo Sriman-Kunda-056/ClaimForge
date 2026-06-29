@@ -1,4 +1,4 @@
-# ClaimForge — AI-Powered OPD Insurance Claim Adjudication
+# ClaimForge - AI-Powered OPD Insurance Claim Adjudication
 
 ClaimForge automates the review and approval of outpatient (OPD) health insurance claims. An employee uploads a medical document (prescription or bill), the system reads it with AI, evaluates it against the policy, and returns an instant decision — **APPROVED / PARTIAL / REJECTED / MANUAL_REVIEW** — with an amount, reasoning, and a member-facing explanation.
 
