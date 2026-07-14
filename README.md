@@ -21,7 +21,7 @@ ClaimForge automates the review and approval of outpatient (OPD) health insuranc
 | Python source files | **10** |
 | JSX modules | **18** |
 
-## Workflow preview
+## Preview
 
 ```mermaid
 flowchart LR
@@ -103,15 +103,16 @@ Employees can open an appeal on any rejected claim. Reviewers reply directly in 
 
 ## Architecture
 
-```
-Frontend (React + Vite)          Backend (FastAPI)
-──────────────────────           ──────────────────────────────────────
-Employee Dashboard      ──────►  POST /extract      → LLM vision/text
-Reviewer Dashboard      ──────►  POST /adjudicate   → Rule engine → LLM explain
-Admin Dashboard         ──────►  GET  /claims        → SQLite
-AI Agent Dashboard      ──────►  GET  /stats
-                                 PUT  /policy
-                                 GET  /ai-logs
+```mermaid
+flowchart LR
+    UI["React + Vite dashboards<br/>employee, reviewer, admin, AI agent"] --> API["FastAPI routes"]
+    API --> EX["Document extraction<br/>optional vision LLM"]
+    API --> RULES["Deterministic policy engine<br/>money + decision logic"]
+    RULES --> DB[("SQLite claims, policy,<br/>appeals, and audit data")]
+    RULES --> DEC["Approved, partial,<br/>rejected, or manual review"]
+    DEC --> NOTE["Optional LLM<br/>member explanation"]
+    DB --> UI
+    NOTE --> UI
 ```
 
 **Key design choice:** the rule engine and LLM are completely separate. The engine runs first and produces a decision; the LLM only phrases it into readable notes afterward. Swapping the LLM provider never changes a claim outcome.
@@ -138,7 +139,7 @@ LLM_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 
 ---
 
-## Running Locally
+## Quick start
 
 ### Prerequisites
 - Python 3.11+
@@ -147,6 +148,8 @@ LLM_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 
 ### Backend
 ```bash
+git clone https://github.com/Sriman-Kunda-056/ClaimForge.git
+cd ClaimForge
 cd backend
 python -m venv .venv
 .venv\Scripts\activate        # Windows
@@ -219,7 +222,7 @@ Without `LLM_API_KEY`, the app still runs — adjudication works fully, but AI e
 
 ---
 
-## Test Suite
+## Tests and validation
 
 10 test cases covering all decision paths are encoded in `backend/tests/test_cases.json` and runnable from the AI Agent dashboard's Eval Runner tab. The engine is considered correct when all 10 pass.
 
@@ -227,3 +230,47 @@ Without `LLM_API_KEY`, the app still runs — adjudication works fully, but AI e
 cd backend
 pytest tests/
 ```
+
+The fixtures were not rerun during this documentation-formatting pass; the
+table above reports tracked repository evidence, not an independently verified
+production accuracy rate.
+
+## Repository layout
+
+```text
+ClaimForge/
+|-- backend/             # FastAPI application, rules, storage, and fixtures
+|   `-- tests/           # Adjudication cases
+|-- frontend/            # React and Vite role-based dashboards
+|-- ARCHITECTURE.md      # Extended system design
+|-- runtime.txt          # Runtime declaration
+`-- README.md
+```
+
+## Limitations
+
+- The application is a prototype and is not approved for real insurance,
+  medical, eligibility, or payment decisions.
+- LLM extraction can misread handwritten or low-quality documents; deterministic
+  rules do not remove input-quality risk.
+- Demo credentials, local SQLite storage, and token authentication require
+  production security hardening.
+- Claim documents, prompts, logs, and screenshots can contain protected health
+  and financial information and must use an appropriate retention policy.
+
+## Numbered commit history
+
+1. `Initial` - import the claim-adjudication application.
+2. `01` - add the evidence scorecard, workflow, and privacy guidance.
+3. `02` - standardize the evidence-first GitHub README format.
+
+## Suggested GitHub topics
+
+`fastapi` `react` `vite` `insurance` `claims-processing`
+`rule-engine` `document-ai` `healthcare` `pydantic` `groq`
+
+## License and attribution
+
+No repository-wide license file is included. Model providers, frameworks, and
+medical-document examples remain subject to their respective terms and privacy
+requirements.
