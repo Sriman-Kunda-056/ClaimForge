@@ -2,6 +2,45 @@
 
 ClaimForge automates the review and approval of outpatient (OPD) health insurance claims. An employee uploads a medical document (prescription or bill), the system reads it with AI, evaluates it against the policy, and returns an instant decision — **APPROVED / PARTIAL / REJECTED / MANUAL_REVIEW** — with an amount, reasoning, and a member-facing explanation.
 
+![Decision outcomes](https://img.shields.io/badge/decision_outcomes-4-2563eb)
+![Roles](https://img.shields.io/badge/documented_roles-4-7c3aed)
+![API](https://img.shields.io/badge/documented_endpoints-12-0ea5e9)
+![Fixtures](https://img.shields.io/badge/adjudication_fixtures-10-2ea44f)
+![Status](https://img.shields.io/badge/status-prototype-f59e0b)
+
+[Configured deployment](https://claim-forge-blush.vercel.app)
+
+## Evidence at a glance
+
+| Repository evidence | Count / status |
+| --- | ---: |
+| Decision outcomes | **4** |
+| User roles | **4** |
+| Documented API endpoints | **12** |
+| Adjudication fixtures | **10** |
+| Python source files | **10** |
+| JSX modules | **18** |
+
+## Workflow preview
+
+```mermaid
+flowchart LR
+    U["1. Upload<br/>prescription or bill"] --> E["2. AI extraction<br/>structured fields"]
+    E --> R["3. Deterministic<br/>policy engine"]
+    R --> D{"4. Decision"}
+    D --> A["Approved"]
+    D --> P["Partial"]
+    D --> X["Rejected"]
+    D --> M["Manual review"]
+    D --> N["5. Member explanation<br/>and appeal trail"]
+```
+
+> **Safety and validation:** this is an auditable prototype, not a production
+> insurance or medical decision system. Screenshots and demos must use synthetic
+> documents because prompts, extraction logs, and claim records can contain
+> sensitive health information. The documented fixtures were not rerun during
+> this repository-presentation pass.
+
 ---
 
 ## What it does
